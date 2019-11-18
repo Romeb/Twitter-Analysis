@@ -1,0 +1,191 @@
+library(twitteR)
+library(dplyr)
+library(purrr)
+library(tm)
+library(wordcloud)
+library(stringr)
+library(rtweet)
+library(ggplot2)
+
+
+api_key<- 
+api_secret <- 
+access_token <- 
+access_token_secret <- 
+setup_twitter_oauth(api_key,api_secret,access_token,access_token_secret)
+
+#Function for displaying the type of device used to tweet
+enodeSource <- function(x) { if(grepl("ipad", tolower(x) )) x = "ipad" else if (grepl("android", tolower(x))) x = "Android"else if (grepl("web", tolower(x))) x = "Web" else x = "others" }
+
+#Gathered users who tweeted using #Samsung, #Huawei, #Apple
+samsung_users <- search_users("#Samsung", n = 500)
+huawei_users <- search_users("#Huawei", n = 500)
+apple_users <- search_users("#Apple", n = 500)
+
+
+#Displays devices used to tweet about Samsung
+samsung_users$source <- sapply(samsung_users$source, function(x) enodeSource(x))
+ggplot(data= samsung_users ,aes(x= source)) +
+geom_bar(fill = "aquamarine4") +
+theme(le\gend.position="none", axis.title.x = element_blank(),axis.text.x = element_text(angle = 45, hjust = 1)) +
+ylab("Number of tweets") +
+ggtitle("Tweets by Source For Samsung")
+
+#Displays devices used to tweet about Huawei
+huawei_users$source <- sapply(Huawei_users$source, function(x) enodeSource(x))
+ggplot(data= huawei_users,aes(x= source)) +
+geom_bar(fill = "aquamarine4") +
+theme(legend.position="none", axis.title.x = element_blank(),axis.text.x = element_text(angle = 45, hjust = 1)) +
+ylab("Number of tweets") +
+ggtitle("Tweets by Source For Huawei")
+
+#Displays devices used to tweet about Apple
+apple_users$source <- sapply(users3$source, function(x) enodeSource(x))
+ggplot(data = apple_users ,aes(x= source)) +
+geom_bar(fill = "aquamarine4") +
+theme(legend.position="none", axis.title.x = element_blank(),axis.text.x = element_text(angle = 45, hjust = 1)) +
+ylab("Number of tweets") +
+ggtitle("Tweets by Source For Apple")
+
+
+#Displays location of users who tweeted with the hashtag #Samsung
+samsung_users %>%
+count(location, sort = TRUE) %>%
+mutate(location = reorder(location,n)) %>%
+na.omit() %>%
+top_n(20) %>%
+ggplot(aes(x = location,y = n)) +
+geom_col() +
+coord_flip() +
+labs(x = "Location",
+y = "Count",
+title = "Twitter users For Samsung - unique locations ")
+
+#Displays location of users who tweeted with the hashtag #Huawei
+huawei_users %>%
+count(location, sort = TRUE) %>%
+mutate(location = reorder(location,n)) %>%
+na.omit() %>%
+top_n(20) %>%
+ggplot(aes(x = location,y = n)) +
+geom_col() +
+coord_flip() +
+labs(x = "Location",
+y = "Count",
+title = "Twitter users For Huawei - unique locations ")
+
+#Displays the location of users who tweeted with the hashtag #Apple
+apple_users %>%
+count(location, sort = TRUE) %>%
+mutate(location = reorder(location,n)) %>%
+na.omit() %>%
+top_n(20) %>%
+ggplot(aes(x = location,y = n)) +
+geom_col() +
+coord_flip() +
+labs(x = "Location",
+y = "Count",
+title = "Twitter users For Apple - unique locations ")
+
+#Negative words for Sentiment Analysis
+neg <- scan("Negative-Words.txt", what="character", comment.char = ";")
+
+#Positive words for Sentiment Analysis
+pos <- scan("Positive-Words.txt", what="character", comment.char = ";")
+
+#Function to clean Tweets and create sentiment analysis
+score.sentiment = function(tweets, pos.words, neg.words)
+{
+scores = laply(tweets, function(tweet, pos.words, neg.words) {
+tweet = gsub('https://','',tweet) # removes https://
+tweet = gsub('http://','',tweet) # removes http://
+tweet=gsub('[^[:graph:]]', ' ',tweet) ## removes graphic characters  #like emoticons
+tweet = gsub('[[:punct:]]', '', tweet) # removes punctuation
+tweet = gsub('[[:cntrl:]]', '', tweet) # removes control characters
+tweet = gsub('\\d+', '', tweet) # removes numbers
+tweet=str_replace_all(tweet,"[^[:graph:]]", " ")
+tweet = tolower(tweet) # makes all letters lowercase
+word.list = str_split(tweet, '\\s+') # splits the tweets by word in a list
+words = unlist(word.list) # turns the list into vector
+pos.matches = match(words, pos.words) ## returns matching
+#values for words from list
+neg.matches = match(words, neg.words)
+pos.matches = !is.na(pos.matches) ## converts matching values to true of false
+neg.matches = !is.na(neg.matches)
+score = sum(pos.matches) - sum(neg.matches) # true and false are
+#treated as 1 and 0 so they can be added
+return(score)
+}, pos.words, neg.words )
+scores.df = data.frame(score=scores, text=tweets)
+return(scores.df)
+}
+
+library(plyr)
+
+#Gathering tweets for Samsung and creating histogram
+samsung_tweets <- searchTwitter('Samsung', n = 2500)
+samsung_tweets.text <- laply(samsung_tweets, function(t)t$getText())
+analysis <- score.sentiment(samsung_tweets.text, pos, neg)
+hist(analysis$score, main ="Score Of Samsung")
+
+#Gathering tweets for Huawei and creating histogram
+huawei_tweets <- searchTwitter('Huawei', n = 2500)
+huawei_tweets.text <- laply(huawei_tweets, function(t)t$getText())
+analysis2 <- score.sentiment(huawei_tweets.text, pos, neg)
+hist(analysis2$score, main ="Score Of Huawei")
+
+apple_tweets <- searchTwitter('Apple', n = 2500)
+apple_tweets.text <- laply(apple_tweets, function(t)t$getText())
+analysis3 <- score.sentiment(apple_tweets.text, pos, neg)
+hist(analysis3$score, main ="Score Of Apple")
+
+#Function used to clean tweets for Word Cloud
+clean.text = function(some_txt){
+ some_txt = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", some_txt) # remove retweet entities
+ some_txt = gsub("@\\w+", "", some_txt) # remove at people
+ some_txt = gsub("[[:punct:]]", "", some_txt) # remove punctuation
+ some_txt = gsub("[[:digit:]]", "", some_txt) # remove numbers
+ some_txt = gsub("[^[:alnum:]]", " ", some_txt) # remove non-alphabetic
+ some_txt = gsub("http\\w+", "", some_txt) # remove html links
+ some_txt = gsub("amp", "", some_txt)
+ # define "tolower error handling" function
+ try.tolower = function(x)
+ {
+ y = NA
+ try_error = tryCatch(tolower(x), error=function(e) e)
+ if (!inherits(try_error, "error"))
+ y = tolower(x)
+ return(y)
+ }
+ 
+ some_txt = sapply(some_txt, try.tolower)
+ some_txt = some_txt[some_txt != ""]
+ names(some_txt) = NULL
+ return(some_txt)
+}
+
+#Creation of Samsung word cloud
+samsung.list <- sapply(samsung_tweets, function(x) x$getText())
+samsung.clean <- clean.text(samsung.list)
+samsung.corpus <- Corpus(VectorSource(samsung.clean))
+rm.words <- c("samsung",  "galaxy", "note", "iphone")
+samsung.corpus <- tm_map(samsung.corpus, removeWords, rm.words)
+wordcloud(samsung.corpus, scale=c(5,0.5), min.freq = 20, random.order=FALSE, colors=rainbow(3))
+
+#Creation of Huawei word cloud
+huawei.list <- sapply(huawei_tweets, function(x) x$getText())
+huawei.clean <- clean.text(huawei.list)
+huawei.corpus <- Corpus(VectorSource(huawei.clean))
+rm.words2 <- c("the",  "china", "and", "pro", "huawei", "with", "for")
+huawei.corpus <- tm_map(huawei.corpus, removeWords, rm.words2)
+wordcloud(huawei.corpus, scale=c(5,0.5), min.freq = 20, random.order=FALSE, colors=rainbow(3))
+
+#Creation of Apple word cloud
+apple.list <- sapply(apple_tweets, function(x) x$getText())
+apple.clean <- clean.text(apple.list)
+apple.corpus <- Corpus(VectorSource(apple.clean))
+rm.words3 <- c("apple",  "and", "you", "the", "iphone")
+apple.corpus <- tm_map(apple.corpus, removeWords, rm.words3)
+wordcloud(apple.corpus, scale=c(5,0.5), min.freq = 20, random.order=FALSE, colors=rainbow(3))
+
+
